@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Heladera</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .recipe-card {
+            transition: all 0.3s ease;
+        }
+        .recipe-card:hover {
+            transform: translateY(-2px);
+        }
+        .modal-overlay {
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-cyan-100 min-h-screen p-4">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-4">
+            <div class="flex items-center justify-between mb-4">
+                <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
+                    <svg class="text-cyan-600" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+                    </svg>
+                    Control de Heladera
+                </h1>
+                <div id="connectionStatus" class="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 text-gray-500">
+                    <div class="w-3 h-3 rounded-full bg-gray-400"></div>
+                    <span class="font-semibold">Desconectado</span>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button id="btnConnect" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m7 7 10 10-5 5V2l5 5L7 17"></path>
+                    </svg>
+                    Conectar Bluetooth
+                </button>
+                <button id="btnDisconnect" class="hidden flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M18 6 6 18M6 6l12 12"></path>
+                    </svg>
+                    Desconectar
+                </button>
+            </div>
+        </div>
+
+        <div class="grid lg:grid-cols-3 gap-4">
+            <!-- Left Column - Recipes -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-lg p-6 mb-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">Recetas</h2>
+                        <button id="btnNewRecipe" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5 12h14M12 5v14"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="recipesList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <!-- Right Column - Controls and Status -->
+            <div class="lg:col-span-2 space-y-4">
+                <!-- Parameters Control -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">Parámetros de Operación</h2>
+                        <span id="selectedRecipeName" class="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold hidden"></span>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Temperatura (°C)</label>
+                            <div class="flex items-center gap-2">
+                                <input type="range" id="targetTemp" min="-20" max="10" value="-5" class="flex-1">
+                                <span id="targetTempValue" class="text-xl font-bold text-cyan-600 w-12 text-right">-5°</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">RPM</label>
+                            <div class="flex items-center gap-2">
+                                <input type="range" id="targetRpm" min="0" max="200" value="80" class="flex-1">
+                                <span id="targetRpmValue" class="text-xl font-bold text-purple-600 w-12 text-right">80</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Tiempo (min)</label>
+                            <div class="flex items-center gap-2">
+                                <input type="range" id="mixingTime" min="5" max="60" value="15" class="flex-1">
+                                <span id="mixingTimeValue" class="text-xl font-bold text-orange-600 w-12 text-right">15</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="btnSendParams" class="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-colors" disabled>
+                        Aplicar Parámetros
+                    </button>
+                </div>
+
+                <!-- Status Display -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">Estado Actual</h2>
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="bg-gradient-to-br from-cyan-50 to-blue-50 p-4 rounded-xl">
+                            <div class="flex items-center gap-2 mb-2">
+                                <svg class="text-cyan-600" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+                                </svg>
+                                <span class="text-sm font-semibold text-gray-700">Temperatura</span>
+                            </div>
+                            <div id="currentTemp" class="text-3xl font-bold text-cyan-700">20.0°C</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl">
+                            <div class="flex items-center gap-2 mb-2">
+                                <svg class="text-purple-600" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"></path>
+                                </svg>
+                                <span class="text-sm font-semibold text-gray-700">RPM</span>
+                            </div>
+                            <div id="currentRpm" class="text-3xl font-bold text-purple-700">0</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-yellow-50 to-orange-50 p-4 rounded-xl">
+                            <div class="flex items-center gap-2 mb-2">
+                                <svg class="text-orange-600" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="m13 2-2 2.5L13 7l-2 2.5L13 12M11 17V7"></path>
+                                </svg>
+                                <span class="text-sm font-semibold text-gray-700">Amperaje</span>
+                            </div>
+                            <div id="currentAmp" class="text-3xl font-bold text-orange-700">0.0A</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button id="btnStart" class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors" disabled>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="m10 8 6 4-6 4Z"></path>
+                            </svg>
+                            Iniciar Motor
+                        </button>
+                        <button id="btnStop" class="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors" disabled>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <rect width="6" height="6" x="9" y="9"></rect>
+                            </svg>
+                            Detener Motor
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Logs -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 16v-4M12 8h.01"></path>
+                        </svg>
+                        Registro de Eventos
+                    </h2>
+                    <div id="logConsole" class="bg-gray-900 text-green-400 p-4 rounded-xl font-mono text-sm h-32 overflow-y-auto">
+                        <div class="text-gray-500">Esperando eventos...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recipe Modal -->
+        <div id="recipeModal" class="fixed inset-0 bg-black/50 modal-overlay hidden items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 id="modalTitle" class="text-2xl font-bold text-gray-800">Nueva Receta</h3>
+                    <button id="btnCloseModal" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6 6 18M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Nombre de la Receta</label>
+                        <input type="text" id="recipeName" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="Ej: Helado de Fresa">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Temperatura: <span id="recipeTemp">-5</span>°C</label>
+                        <input type="range" id="recipeTempRange" min="-20" max="10" value="-5" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">RPM: <span id="recipeRpm">80</span></label>
+                        <input type="range" id="recipeRpmRange" min="0" max="200" value="80" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Tiempo: <span id="recipeTime">15</span> min</label>
+                        <input type="range" id="recipeTimeRange" min="5" max="60" value="15" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Color</label>
+                        <div class="grid grid-cols-4 gap-2" id="colorPicker"></div>
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button id="btnCancelModal" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-xl transition-colors">Cancelar</button>
+                    <button id="btnSaveRecipe" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg>
+                        Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let state = {
+            connected: false,
+            motorRunning: false,
+            device: null,
+            currentTemp: 20,
+            currentRpm: 0,
+            currentAmp: 0,
+            targetTemp: -5,
+            targetRpm: 80,
+            mixingTime: 15,
+            recipes: [
+                { id: 1, name: 'Helado de Vainilla', temp: -5, rpm: 80, time: 15, color: 'yellow' },
+                { id: 2, name: 'Helado de Chocolate', temp: -6, rpm: 90, time: 18, color: 'brown' },
+                { id: 3, name: 'Gelato Italiano', temp: -8, rpm: 120, time: 12, color: 'pink' },
+                { id: 4, name: 'Frozen Yogurt', temp: -4, rpm: 70, time: 10, color: 'purple' }
+            ],
+            selectedRecipe: null,
+            editingRecipe: null,
+            interval: null
+        };
+
+        const colors = {
+            yellow: 'from-yellow-100 to-yellow-200 border-yellow-400',
+            brown: 'from-amber-100 to-amber-200 border-amber-600',
+            pink: 'from-pink-100 to-pink-200 border-pink-400',
+            purple: 'from-purple-100 to-purple-200 border-purple-400',
+            blue: 'from-blue-100 to-blue-200 border-blue-400',
+            green: 'from-green-100 to-green-200 border-green-400',
+            red: 'from-red-100 to-red-200 border-red-400',
+            orange: 'from-orange-100 to-orange-200 border-orange-400'
+        };
+
+        // Utility Functions
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString('es-MX');
+            const logDiv = document.getElementById('logConsole');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'mb-1';
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            if (logDiv.children.length > 5) {
+                logDiv.removeChild(logDiv.children[0]);
+            }
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            const btnConnect = document.getElementById('btnConnect');
+            const btnDisconnect = document.getElementById('btnDisconnect');
+            const btnSendParams = document.getElementById('btnSendParams');
+            const btnStart = document.getElementById('btnStart');
+            const btnStop = document.getElementById('btnStop');
+
+            if (connected) {
+                status.className = 'flex items-center gap-2 px-4 py-2 rounded-full bg-green-100 text-green-700';
+                status.innerHTML = '<div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div><span class="font-semibold">Conectado</span>';
+                btnConnect.classList.add('hidden');
+                btnDisconnect.classList.remove('hidden');
+                btnSendParams.disabled = false;
+                btnStart.disabled = false;
+            } else {
+                status.className = 'flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 text-gray-500';
+                status.innerHTML = '<div class="w-3 h-3 rounded-full bg-gray-400"></div><span class="font-semibold">Desconectado</span>';
+                btnConnect.classList.remove('hidden');
+                btnDisconnect.classList.add('hidden');
+                btnSendParams.disabled = true;
+                btnStart.disabled = true;
+                btnStop.disabled = true;
+            }
+        }
+
+        function renderRecipes() {
+            const list = document.getElementById('recipesList');
+            list.innerHTML = state.recipes.map(recipe => `
+                <div class="recipe-card bg-gradient-to-r ${colors[recipe.color]} border-2 p-4 rounded-xl ${state.selectedRecipe?.id === recipe.id ? 'ring-4 ring-blue-400' : ''}">
+                    <div class="flex items-start justify-between mb-2">
+                        <h3 class="font-bold text-gray-800 flex-1">${recipe.name}</h3>
+                        <div class="flex gap-1">
+                            <button onclick="editRecipe(${recipe.id})" class="p-1 hover:bg-white/50 rounded transition-colors">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                            <button onclick="deleteRecipe(${recipe.id})" class="p-1 hover:bg-white/50 rounded transition-colors">
+                                <svg class="text-red-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-700 space-y-1 mb-3">
+                        <div>🌡️ ${recipe.temp}°C</div>
+                        <div>⚡ ${recipe.rpm} RPM</div>
+                        <div>⏱️ ${recipe.time} min</div>
+                    </div>
+                    <button onclick="loadRecipe(${recipe.id})" class="w-full bg-white/70 hover:bg-white text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors text-sm">
+                        Cargar Receta
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function loadRecipe(id) {
+            const recipe = state.recipes.find(r => r.id === id);
+            if (recipe) {
+                state.selectedRecipe = recipe;
+                state.targetTemp = recipe.temp;
+                state.targetRpm = recipe.rpm;
+                state.mixingTime = recipe.time;
+                
+                document.getElementById('targetTemp').value = recipe.temp;
+                document.getElementById('targetRpm').value = recipe.rpm;
+                document.getElementById('mixingTime').value = recipe.time;
+                document.getElementById('targetTempValue').textContent = recipe.temp + '°';
+                document.getElementById('targetRpmValue').textContent = recipe.rpm;
+                document.getElementById('mixingTimeValue').textContent = recipe.time;
+                
+                const recipeName = document.getElementById('selectedRecipeName');
+                recipeName.textContent = recipe.name;
+                recipeName.classList.remove('hidden');
+                
+                renderRecipes();
+                addLog(`📋 Receta "${recipe.name}" cargada`);
+            }
+        }
+
+        function editRecipe(id) {
+            const recipe = state.recipes.find(r => r.id === id);
+            if (recipe) {
+                state.editingRecipe = recipe;
+                document.getElementById('modalTitle').textContent = 'Editar Receta';
+                document.getElementById('recipeName').value = recipe.name;
+                document.getElementById('recipeTempRange').value = recipe.temp;
+                document.getElementById('recipeRpmRange').value = recipe.rpm;
+                document.getElementById('recipeTimeRange').value = recipe.time;
+                document.getElementById('recipeTemp').textContent = recipe.temp;
+                document.getElementById('recipeRpm').textContent = recipe.rpm;
+                document.getElementById('recipeTime').textContent = recipe.time;
+                selectedColor = recipe.color;
+                renderColorPicker();
+                document.getElementById('recipeModal').classList.remove('hidden');
+                document.getElementById('recipeModal').classList.add('flex');
+            }
+        }
+
+        function deleteRecipe(id) {
+            const recipe = state.recipes.find(r => r.id === id);
+            if (recipe && confirm(`¿Eliminar la receta "${recipe.name}"?`)) {
+                state.recipes = state.recipes.filter(r => r.id !== id);
+                if (state.selectedRecipe?.id === id) {
+                    state.selectedRecipe = null;
+                    document.getElementById('selectedRecipeName').classList.add('hidden');
+                }
+                renderRecipes();
+                addLog(`✗ Receta "${recipe.name}" eliminada`);
+            }
+        }
+
+        let selectedColor = 'blue';
+        function renderColorPicker() {
+            const picker = document.getElementById('colorPicker');
+            picker.innerHTML = Object.keys(colors).map(color => `
+                <button onclick="selectColor('${color}')" class="h-12 rounded-lg border-4 ${selectedColor === color ? 'border-gray-800' : 'border-gray-300'} bg-gradient-to-r ${colors[color]}"></button>
+            `).join('');
+        }
+
+        function selectColor(color) {
+            selectedColor = color;
+            renderColorPicker();
+        }
+
+        // Bluetooth Functions
+        async function connectBluetooth() {
+            try {
+                addLog('Buscando dispositivo Bluetooth...');
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: ['battery_service'] }],
+                    optionalServices: ['battery_service']
+                });
+                
+                addLog(`Conectando a ${device.name}...`);
+                const server = await device.gatt.connect();
+                
+                state.device = device;
+                state.connected = true;
+                updateConnectionStatus(true);
+                addLog('✓ Conectado exitosamente');
+                
+                device.addEventListener('gattserverdisconnected', () => {
+                    state.connected = false;
+                    state.motorRunning = false;
+                    updateConnectionStatus(false);
+                    addLog('✗ Dispositivo desconectado');
+                    if (state.interval) clearInterval(state.interval);
+                });
+            } catch (error) {
+                addLog(`✗ Error: ${error.message}`);
+            }
+        }
+
+        function disconnect() {
+            if (state.device && state.device.gatt.connected) {
+                state.device.gatt.disconnect();
+                addLog('Desconectado manualmente');
+            }
+            state.device = null;
+            state.connected = false;
+            state.motorRunning = false;
+            updateConnectionStatus(false);
+            if (state.interval) clearInterval(state.interval);
+        }
+
+        function startMotor() {
+            if (!state.connected) {
+                addLog('✗ No hay conexión Bluetooth');
+                return;
+            }
+            state.motorRunning = true;
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStop').disabled = false;
+            addLog(`▶ Motor iniciado - ${state.targetRpm} RPM, ${state.mixingTime} min`);
+            
+            state.interval = setInterval(() => {
+                state.currentTemp = Math.max(state.targetTemp, state.currentTemp - 0.5);
+                state.currentRpm = Math.min(state.targetRpm, state.currentRpm + 5);
+                state.currentAmp = Math.min(8, state.currentAmp + 0.2);
+                
+                document.getElementById('currentTemp').textContent = state.currentTemp.toFixed(1) + '°C';
+                document.getElementById('currentRpm').textContent = state.currentRpm;
+                document.getElementById('currentAmp').textContent = state.currentAmp.toFixed(1) + 'A';
+            }, 1000);
+        }
+
+        function stopMotor() {
+            if (!state.connected) {
+                addLog('✗ No hay conexión Bluetooth');
+                return;
+            }
+            state.motorRunning = false;
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnStop').disabled = true;
+            addLog('■ Motor detenido');
+            
+            if (state.interval) clearInterval(state.interval);
+            state.currentRpm = 0;
+            state.currentAmp = 0;
+            document.getElementById('currentRpm').textContent = '0';
+            document.getElementById('currentAmp').textContent = '0.0A';
+        }
+
+        function sendParameters() {
+            if (!state.connected) {
+                addLog('✗ No hay conexión Bluetooth');
+                return;
+            }
+            addLog(`📤 Enviando: Temp=${state.targetTemp}°C, RPM=${state.targetRpm}, Tiempo=${state.mixingTime}min`);
+        }
+
+        // Event Listeners
+        document.getElementById('btnConnect').addEventListener('click', connectBluetooth);
+        document.getElementById('btnDisconnect').addEventListener('click', disconnect);
+        document.getElementById('btnStart').addEventListener('click', startMotor);
+        document.getElementById('btnStop').addEventListener('click', stopMotor);
+        document.getElementById('btnSendParams').addEventListener('click', sendParameters);
+
+        document.getElementById('targetTemp').addEventListener('input', (e) => {
+            state.targetTemp = parseInt(e.target.value);
+            document.getElementById('targetTempValue').textContent = state.targetTemp + '°';
+        });
+
+        document.getElementById('targetRpm').addEventListener('input', (e) => {
+            state.targetRpm = parseInt(e.target.value);
+            document.getElementById('targetRpmValue').textContent = state.targetRpm;
+        });
+
+        document.getElementById('mixingTime').addEventListener('input', (e) => {
+            state.mixingTime = parseInt(e.target.value);
+            document.getElementById('mixingTimeValue').textContent = state.mixingTime;
+        });
+
+        // Recipe Modal Events
+        document.getElementById('btnNewRecipe').addEventListener('click', () => {
+            state.editingRecipe = null;
+            document.getElementById('modalTitle').textContent = 'Nueva Receta';
+            document.getElementById('recipeName').value = '';
+            document.getElementById('recipeTempRange').value = -5;
+            document.getElementById('recipeRpmRange').value = 80;
+            document.getElementById('recipeTimeRange').value = 15;
+            document.getElementById('recipeTemp').textContent = '-5';
+            document.getElementById('recipeRpm').textContent = '80';
+            document.getElementById('recipeTime').textContent = '15';
+            selectedColor = 'blue';
+            renderColorPicker();
+            document.getElementById('recipeModal').classList.remove('hidden');
+            document.getElementById('recipeModal').classList.add('flex');
+        });
+
+        document.getElementById('btnCloseModal').addEventListener('click', () => {
+            document.getElementById('recipeModal').classList.add('hidden');
+            document.getElementById('recipeModal').classList.remove('flex');
+        });
+
+        document.getElementById('btnCancelModal').addEventListener('click', () => {
+            document.getElementById('recipeModal').classList.add('hidden');
+            document.getElementById('recipeModal').classList.remove('flex');
+        });
+
+        document.getElementById('recipeTempRange').addEventListener('input', (e) => {
+            document.getElementById('recipeTemp').textContent = e.target.value;
+        });
+
+        document.getElementById('recipeRpmRange').addEventListener('input', (e) => {
+            document.getElementById('recipeRpm').textContent = e.target.value;
+        });
+
+        document.getElementById('recipeTimeRange').addEventListener('input', (e) => {
+            document.getElementById('recipeTime').textContent = e.target.value;
+        });
+
+        document.getElementById('btnSaveRecipe').addEventListener('click', () => {
+            const name = document.getElementById('recipeName').value.trim();
+            if (!name) {
+                addLog('✗ El nombre de la receta es requerido');
+                return;
+            }
+
+            const newRecipe = {
+                name: name,
+                temp: parseInt(document.getElementById('recipeTempRange').value),
+                rpm: parseInt(document.getElementById('recipeRpmRange').value),
+                time: parseInt(document.getElementById('recipeTimeRange').value),
+                color: selectedColor
+            };
+
+            if (state.editingRecipe) {
+                newRecipe.id = state.editingRecipe.id;
+                state.recipes = state.recipes.map(r => r.id === newRecipe.id ? newRecipe : r);
+                addLog(`✓ Receta "${newRecipe.name}" actualizada`);
+            } else {
+                newRecipe.id = Date.now();
+                state.recipes.push(newRecipe);
+                addLog(`✓ Receta "${newRecipe.name}" creada`);
+            }
+
+            renderRecipes();
+            document.getElementById('recipeModal').classList.add('hidden');
+            document.getElementById('recipeModal').classList.remove('flex');
+        });
+
+        // Initialize
+        renderRecipes();
+        renderColorPicker();
+        addLog('Sistema iniciado');
+    </script>
+</body>
+</html>
